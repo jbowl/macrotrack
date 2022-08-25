@@ -28,6 +28,9 @@ func GetStorage(storeagetype string, dsn string) Storage {
 
 	switch storeagetype {
 
+	case "mysql":
+		db = &MysqlDB{}
+
 	case "mongo":
 		//db = &mongoDB
 
