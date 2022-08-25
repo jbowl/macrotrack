@@ -14,7 +14,7 @@ import (
 
 const create = `INSERT INTO macros(carbs, protein, fat, alcohol) OUTPUT Inserted.id VALUES (@carbs, @protein, @fat , @alcohol);`
 const readall = `SELECT * FROM macros;`
-const read = `SELECT carbs, protein, fat, alcohol, date FROM macros WHERE id=@id;`
+const read = `SELECT id, carbs, protein, fat, alcohol, date FROM macros WHERE id=@id;`
 const update = `UPDATE macros SET carbs=@carbs, protein=@protein, fat=@fat, alcohol=@alcohol WHERE id = @id`
 const delete = `DELETE from macros WHERE id = @id;`
 
@@ -200,7 +200,7 @@ func (s *sqlserver) Read(_uuid uuid.UUID) (*types.Macro, error) {
 	)
 
 	//u := uuid.UUID{}
-	err = newRecord.Scan(&retMacro.Carbs, &retMacro.Protein, &retMacro.Fat, &retMacro.Alcohol, &retMacro.Date)
+	err = newRecord.Scan(&retMacro.ID, &retMacro.Carbs, &retMacro.Protein, &retMacro.Fat, &retMacro.Alcohol, &retMacro.Date)
 	//err = newRecord.Scan(&retID)
 
 	if err != nil {
