@@ -22,9 +22,13 @@ func CreateMacro(store store.Storage) http.Handler {
 func CreateMacroHandler(store store.Storage, w http.ResponseWriter, r *http.Request) {
 	///////////   grab JSON from request body
 	var macro types.Macro
+
+	//	b, err := io.ReadAll(r.Body)
+	//	fmt.Println(string(b))
+
 	if err := json.NewDecoder(r.Body).Decode(&macro); err != nil {
 		detailsResponse(w, types.ProblemDetails{
-			Detail: "unable to decode request body",
+			Detail: fmt.Sprintf("unable to decode request body %v", err),
 			Title:  http.StatusText(http.StatusBadRequest),
 			Status: http.StatusBadRequest,
 		})
@@ -131,62 +135,70 @@ func ReadMacroHandler(store store.Storage, w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(macro)
 }
 
+func UpdateMacroHandler(store store.Storage, w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	u := vars["uuid"]
+
+	// test cases
+	if len(u) == 0 && len(r.URL.Path) > 32 {
+		// strip of /macros from testcase
+		u = r.URL.Path[8:]
+	}
+
+	macro_uuid, err := uuid.Parse(u)
+
+	if err != nil {
+		detailsResponse(w, types.ProblemDetails{
+			Detail: "unable to decode request body",
+			Title:  http.StatusText(http.StatusBadRequest),
+			Status: http.StatusBadRequest,
+		})
+		return
+	}
+
+	fmt.Println(macro_uuid)
+
+	///////////   grab JSON from request body
+	var macro types.Macro
+	if err := json.NewDecoder(r.Body).Decode(&macro); err != nil {
+		detailsResponse(w, types.ProblemDetails{
+			Detail: "unable to decode request body",
+			Title:  http.StatusText(http.StatusBadRequest),
+			Status: http.StatusBadRequest,
+		})
+		return
+	}
+
+	if err := macro.Validate(); err != nil {
+		detailsResponse(w, types.ProblemDetails{
+			Detail: "unable to decode request body",
+			Title:  http.StatusText(http.StatusBadRequest),
+			Status: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// location header
+
+	if err := store.Update(macro_uuid, macro); err != nil {
+		detailsResponse(w, types.ProblemDetails{
+			Detail: "store.Create",
+			Title:  http.StatusText(http.StatusBadRequest),
+			Status: http.StatusBadRequest,
+		})
+		return
+	}
+
+	//w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid.UUID.String()))
+	//w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid))
+	w.WriteHeader(http.StatusOK)
+}
+
 func UpdateMacro(store store.Storage) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-
-			vars := mux.Vars(r)
-
-			u := vars["uuid"]
-
-			macro_uuid, err := uuid.Parse(u)
-
-			if err != nil {
-				detailsResponse(w, types.ProblemDetails{
-					Detail: "unable to decode request body",
-					Title:  http.StatusText(http.StatusBadRequest),
-					Status: http.StatusBadRequest,
-				})
-				return
-			}
-
-			fmt.Println(macro_uuid)
-
-			///////////   grab JSON from request body
-			var macro types.Macro
-			if err := json.NewDecoder(r.Body).Decode(&macro); err != nil {
-				detailsResponse(w, types.ProblemDetails{
-					Detail: "unable to decode request body",
-					Title:  http.StatusText(http.StatusBadRequest),
-					Status: http.StatusBadRequest,
-				})
-				return
-			}
-
-			if err := macro.Validate(); err != nil {
-				detailsResponse(w, types.ProblemDetails{
-					Detail: "unable to decode request body",
-					Title:  http.StatusText(http.StatusBadRequest),
-					Status: http.StatusBadRequest,
-				})
-				return
-			}
-
-			// location header
-
-			if err := store.Update(macro_uuid, macro); err != nil {
-				detailsResponse(w, types.ProblemDetails{
-					Detail: "store.Create",
-					Title:  http.StatusText(http.StatusBadRequest),
-					Status: http.StatusBadRequest,
-				})
-				return
-			}
-
-			//w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid.UUID.String()))
-			//w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid))
-			w.WriteHeader(http.StatusOK)
-
+			UpdateMacroHandler(store, w, r)
 		})
 }
 
