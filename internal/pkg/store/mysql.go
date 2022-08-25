@@ -23,27 +23,30 @@ import (
 )
 
 type MysqlDB struct {
-	DB *sql.DB
+	DB  *sql.DB
+	DSN string
 }
 
-// macro_uuid uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-// date  TIMESTAMP WITH TIME ZONE default CURRENT_TIMESTAMP
+const createMS = `INSERT INTO macros (id, carbs, protein, fat, alcohol) VALUES (?, ?, ?, ?,?);`
+const readAllMS = `SELECT id, carbs, protein, fat, alcohol, date FROM macros`
+const readByIDMS = `SELECT id, carbs, protein, fat, alcohol, date FROM macros WHERE id = ?`
+const updateByIDMS = `UPDATE macros SET carbs=?, protein=?, fat=?, alcohol=? WHERE id = ?`
+const deleteByIDMS = `DELETE from macros WHERE id = ?;`
+
+// SELECT BIN_TO_UUID(id) id , carbs, protein, fat, alcohol, `date`
+//
+//	FROM macros.macros;
 const tableCreationQueryMysql = `CREATE TABLE IF NOT EXISTS macros
 (
-	macro_uuid BINARY(16) PRIMARY KEY,	
+	id BINARY(16) PRIMARY KEY,	
     carbs int NOT NULL,
 	protein int NOT NULL,
 	fat int NOT NULL,
 	alcohol int NOT NULL,
-	date datetime default CURRENT_TIMESTAMP
-	
+	date datetime default CURRENT_TIMESTAMP	
 )`
 
 func (s *MysqlDB) createTable() error {
-
-	//	query := `CREATE TABLE IF NOT EXISTS product(product_id int primary key auto_increment, product_name text,
-	//        product_price int, created_at datetime default CURRENT_TIMESTAMP, updated_at datetime default CURRENT_TIMESTAMP)`
-
 	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelfunc()
 
@@ -66,10 +69,10 @@ func (s *MysqlDB) Init() error {
 
 	var err error
 
-	dsn := "root:mysql@tcp(127.0.0.1:3306)/mysql"
-	s.DB, err = sql.Open("mysql", dsn)
+	s.DSN = "gouser:gopwd@tcp(127.0.0.1:3306)/macros"
 
-	//	s.DB, err = sql.Open("mysql", "username:password@tcp(127.0.0.1:3306)/test")
+	//dsn := "root:mysql@tcp(127.0.0.1:3306)/mysql"
+	s.DB, err = sql.Open("mysql", s.DSN)
 
 	if err != nil {
 		return err
@@ -88,29 +91,107 @@ func (s *MysqlDB) Open() error {
 
 func (s *MysqlDB) Create(m types.Macro) (string, error) {
 
-	retUUID := uuid.NullUUID{}
+	retUUID := uuid.New()
+	b, err := retUUID.MarshalBinary()
 
-	sqlStatement := `
-			INSERT INTO macros (carbs, protein, fat, alcohol)
-			VALUES ($1, $2, $3, $4 ) RETURNING macro_uuid`
+	if err != nil {
+		return retUUID.String(), err
+	}
 
-	fmt.Println(sqlStatement)
+	// fails every time, or more likely driver bug reports failure when works successfully
+	row := s.DB.QueryRow(createMS, b, m.Carbs, m.Protein, m.Fat, m.Alcohol)
+	row.Err()
 
-	err := s.DB.QueryRow(sqlStatement, m.Carbs, m.Protein, m.Fat, m.Alcohol).Scan(&retUUID)
+	// secondary scan to check success and get key of new row
+	row = s.DB.QueryRow("select id from macros where id = ?", b)
+	var uuidBytes []byte
 
-	return retUUID.UUID.String(), err
+	err = row.Scan(&uuidBytes)
+	if err != nil {
+		return retUUID.String(), err
+	}
 
-	return "", nil
+	// assert uuid == retUUID
+
+	uuid, err := uuid.FromBytes(uuidBytes)
+	return uuid.String(), err
+
 }
 
-func (s *MysqlDB) Read(uuid.UUID) (*types.Macro, error) {
-	return nil, nil
+// ReadAll - returns array of types.Macro or error
+func (s *MysqlDB) ReadAll() ([]types.Macro, error) {
+
+	m := make([]types.Macro, 0)
+
+	data, err := s.DB.Query(readAllMS)
+
+	if err != nil {
+		return m, err
+	}
+
+	for data.Next() {
+
+		t := types.Macro{}
+
+		if err := data.Scan(&t.ID, &t.Carbs, &t.Protein, &t.Fat, &t.Alcohol, &t.Date); err != nil {
+			return m, err
+		}
+
+		m = append(m, t)
+	}
+
+	return m, nil
 }
 
-func (s *MysqlDB) Update() error {
-	return nil
+func (s *MysqlDB) Read(u uuid.UUID) (*types.Macro, error) {
+
+	binaryUUID, err := u.MarshalBinary()
+
+	if err != nil {
+		return nil, err
+	}
+
+	retMacro := types.Macro{}
+	// Execute the query
+	err = s.DB.QueryRow(readByIDMS, binaryUUID).Scan(&retMacro.ID, &retMacro.Carbs, &retMacro.Protein, &retMacro.Fat, &retMacro.Alcohol, &retMacro.Date)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &retMacro, err
 }
 
-func (s *MysqlDB) Delete(uuid.UUID) error {
-	return nil
+func (s *MysqlDB) Update(u uuid.UUID, m types.Macro) error {
+
+	binaryUUID, err := u.MarshalBinary()
+
+	if err != nil {
+		return err
+	}
+
+	res, err := s.DB.Exec(updateByIDMS, m.Carbs, m.Protein, m.Fat, m.Alcohol, binaryUUID)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(res.RowsAffected())
+
+	return err
+
+}
+
+func (s *MysqlDB) Delete(u uuid.UUID) (int64, error) {
+
+	binaryUUID, err := u.MarshalBinary()
+
+	if err != nil {
+		return -1, err
+	}
+	result, err := s.DB.Exec(deleteByIDMS, binaryUUID)
+	if err != nil {
+		return -1, err
+	}
+
+	return result.RowsAffected()
 }
