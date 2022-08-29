@@ -58,7 +58,10 @@ func CreateMacroHandler(store store.Storage, w http.ResponseWriter, r *http.Requ
 	}
 
 	//w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid.UUID.String()))
-	w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid))
+	//	w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid))
+
+	w.Header().Set("location", fmt.Sprintf("%s/%s", r.URL.Path, uuid))
+
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -192,6 +195,9 @@ func UpdateMacroHandler(store store.Storage, w http.ResponseWriter, r *http.Requ
 
 	//w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid.UUID.String()))
 	//w.Header().Set("location", fmt.Sprintf("%s%s/%s", r.Host, r.URL.Path, uuid))
+
+	w.Header().Set("location", r.URL.Path)
+
 	w.WriteHeader(http.StatusOK)
 }
 

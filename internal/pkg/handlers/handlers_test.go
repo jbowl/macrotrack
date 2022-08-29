@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -19,13 +21,33 @@ import (
 
 var dataStore store.Storage
 
+func DSNFromFile(file string) string {
+	f, err := os.Open(file)
+	if err != nil {
+		return ""
+	}
+
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+
+	// find string after DSN=
+	for scanner.Scan() {
+
+		ss := strings.SplitAfter(scanner.Text(), "DSN=")
+
+		if len(ss) > 1 {
+
+			return ss[1]
+
+		}
+
+		fmt.Println(scanner.Text())
+	}
+	return ""
+}
+
 func TestMain(m *testing.M) {
-
-	//cmdString := `docker run -d -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=___Aa123" --name sqlserver_test --hostname sqlserver_test --rm mcr.microsoft.com/mssql/server:2019-latest`
-
-	//dataStore.Init()
-
-	//store.DSN = fmt.Sprintf("user id=%s;password=%s;port=%s;database=%s", store.User, store.Password, store.Port, store.Database)
 
 	path, err := os.Getwd()
 	if err != nil {
@@ -34,16 +56,27 @@ func TestMain(m *testing.M) {
 	fmt.Println(path) // for example /home/user
 
 	cmdString := `./ctr.sh`
-	cmd := exec.Command(cmdString)
+	//cmdString := `./mysqldb.sh`
 
+	// DSN="..."
+	DSN := DSNFromFile(cmdString)
+	if len(DSN) < 1 {
+		log.Fatalf("DSN string not found in container script file")
+	}
+
+	// startup contaner
+	cmd := exec.Command(cmdString)
 	err = cmd.Run()
 
 	if err != nil {
 		log.Fatalf("unable to start test container %v", err)
-
 	}
 
-	dataStore = store.GetStorage("sqlserver", "user id=SA;password=___Aa123;port=1434;database=master")
+	//dataStore = store.GetStorage("sqlserver", "user id=SA;password=___Aa123;port=1434;database=master")
+	//dataStore = store.GetStorage("mysql", DSN)
+	dataStore = store.GetStorage("sqlserver", DSN)
+
+	//s.DSN = "gouser:gopwd@tcp(127.0.0.1:3306)/macros"
 
 	dataStore.Init()
 
@@ -103,8 +136,7 @@ func TestCRUD(t *testing.T) {
 
 	res.Body.Close()
 
-	h := res.Header.Get("location")
-	path := h[11:]
+	path := res.Header.Get("location")
 
 	readRes := Read(path)
 
@@ -146,8 +178,8 @@ func TestCRUD(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	h2 := uRes.Header.Get("location")
-	path2 := h2[11:]
+	path2 := uRes.Header.Get("location")
+	//	path2 := h2[11:]
 
 	readRes2 := Read(path2)
 
@@ -170,6 +202,10 @@ func TestCRUD(t *testing.T) {
 }
 
 func TestCreateMacro(t *testing.T) {
+
+	//	m := types.Macro{Carbs: 100, Protein: 99, Fat: 98, Alcohol: 97}
+
+	//	json.Marshal(m)
 
 	var jsonStr = []byte(`{"carbs":100, "protein": 99, "fat":98, "alcohol":97}`)
 
@@ -203,9 +239,8 @@ func TestCreateMacro(t *testing.T) {
 
 	//	}
 
-	h := res.Header.Get("location")
-	path := h[11:]
-	req = httptest.NewRequest(http.MethodGet, path, nil)
+	loc := res.Header.Get("location")
+	req = httptest.NewRequest(http.MethodGet, loc, nil)
 
 	w2 := httptest.NewRecorder()
 
@@ -217,12 +252,19 @@ func TestCreateMacro(t *testing.T) {
 	//	var fileInfo stagingfile
 
 	data, err := io.ReadAll(readRes.Body)
+	if err == nil {
+		fmt.Println(err)
+	}
 
-	//			err := json.Unmarshal(r.Body, fileInfo)
+	var m types.Macro
+
+	err = json.Unmarshal(data, &m) // unmarshall byte to JSON
+	//bytes, err =  json.Marshal(m)            // marshall json to byte
 	//	err := json.NewDecoder(r.Body).Decode(&fileInfo)
 
 	if err == nil {
-		fmt.Println(string(data))
+		fmt.Println(err)
+		//	fmt.Println(string(data))
 	}
 
 }
@@ -234,7 +276,6 @@ func TestReadMacro(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	//store := store.GetStorage("foo")
-
 	//store.Init()
 
 	ReadMacroHandler(dataStore, w, req)
