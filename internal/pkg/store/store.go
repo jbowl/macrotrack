@@ -40,6 +40,9 @@ func GetStorage(storeagetype string, dsn string) Storage {
 	case "postgres":
 		db = &postgres{DSN: dsn}
 
+	case "snowflake":
+		db = &snwflk{DSN: dsn}
+
 	}
 
 	fmt.Println(storeagetype)

@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -19,14 +18,15 @@ func init() {
 	}
 	fmt.Println(path) // for example /home/user
 
-	cmdString := `./start_ctrs.sh`
-	cmd := exec.Command(cmdString)
+	/*
+		cmdString := `./start_ctrs.sh`
+		cmd := exec.Command(cmdString)
 
-	err = cmd.Run()
+		err = cmd.Run()
 
-	if err != nil {
-		log.Fatalf("unable to start database container %v", err)
+		if err != nil {
+			log.Fatalf("unable to start database container %v", err)
 
-	}
-
+		}
+	*/
 }
